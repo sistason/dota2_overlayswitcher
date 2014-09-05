@@ -14,7 +14,7 @@ Installation
 ===========
 * You need Python 2 (2.7, but should work maybe down to 2.5)
 * You need OpenCV, Matplotlib and Numpy for python, together with [pywin32](http://sourceforge.net/projects/pywin32/)
-
+* You need to add 'con_logfile console.log' and "echo 'Start of Game"' to your autoexec.cfg to enable the Dota 2 logging.
 
 Usage
 =====
