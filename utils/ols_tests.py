@@ -2,23 +2,58 @@
 import numpy as np
 import pylab as pl
 
+from threading import Thread
+from time import sleep
+
+class DotaLogWatcher():
+    path = ''
+    _thread = None
+    _dota_log = None
+    _overlayswitcher = None
+    _active = True
+
+    
+    def __init__(self, path, overlayswitcher):
+        self.path = path
+        self._overlayswitcher = overlayswitcher
+        self._dota_log = open(self.path, 'r+')
+        self._thread = Thread(target=self._spin)
+        self._thread.start()
+        
+    def stop(self):
+        self._active = False
+        sleep(0.5)
+        if self._thread.is_alive:
+            self._thread._Thread__stop()
+        self._dota_log.close()
+      
+    def _spin(self):
+        while self._active and not sleep(0.016):  #frame at 60fps
+            new_content = self._dota_log.read()
+            if new_content:
+                prev_state_ = self._overlayswitcher.base_state
+                self._update_state(new_content)
+                if self._overlayswitcher.base_state != prev_state_:
+                    self._overlayswitcher.work()
+        
+    def _update_state(self, new_content):
+        for line in reversed(new_content.split('\n')):
+            if line.startswith('Start of Dota'):
+                self._overlayswitcher.base_state = 'MENU'
+                return
+
+            pos_rule = line.find('DOTA_GAMERULES_STATE_')
+            if pos_rule >= 0:
+                self._overlayswitcher.base_state = line[pos_rule+21:-1]
+                return
+        
+        
 class TestGameEnv():
     """Base Class for everything concerning actual Dota 2 processing
     """
     def __init__(self):
         pass
 
-    def get_newest_base_state(self):
-        """Get the newest state from the log-file of Dota 2"""
-        ret = self.dota_log.read()
-        for line in reversed(ret.split('\n')):
-            if line.startswith('Start of Dota'):
-                return 'MENU'
-
-            pos_rule = line.find('DOTA_GAMERULES_STATE_')
-            if pos_rule >= 0:
-                return line[pos_rule+21:-1]
-        
     def determine_game_state(self, img):
         """Determine which state Dota 2 is currently in.
         
@@ -29,17 +64,13 @@ class TestGameEnv():
         # Break if screen is blank
         if img is None or not img.any():
             return ''
-
-        base_state = self.get_newest_base_state()
-        if base_state:
-            self.base_state = base_state
-            
+     
         # Order-Dependencies:
         # scoreboard > loadingplayers (black top/bot-border)
         # draft, scoreboard, loadingplayers > ingame (minimize-icon)
 
         #Simple, distinct icon-searches
-        if self.base_state == 'menu' or self.test_menu(img):
+        if self.base_state == 'MENU' or self.test_menu(img):
             return 'MENU'
         return self.base_state
         
@@ -84,70 +115,69 @@ class TestGameEnv():
 
         Checks if the settings-icon is in the top left corner. The icon
         is symbolized by having a hole in the middle (the gear-symbol)."""
-        img = img[:40, :100]
-        
+        height, width = img.shape[:2]
+
+        #height/24 and width/16 crops only the icons
+        img = img[:height/25.0, :width/16.0]
+
         # The icons are distinguishable by their special grey color
         img_hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
         bot_grey, top_grey = self.COLOR_HSV_MENU
         img_thresh = cv2.inRange(img_hsv, bot_grey, top_grey)
 
-        # Erode twice as it does not matter for the purpose of finding the hole,
-        # but eliminates possible noise in the image
-        img_thresh_eroded = cv2.erode(img_thresh, np.ones((2,2),np.uint8), iterations=2)
-        if not img_thresh_eroded.any():
+        if not img_thresh.any():
             return False
         
         # Crop the image to only keep the icons
-        left_border, right_border, top_border, bot_border = self.utils_find_borders(img_thresh_eroded)
-        
-        img_cropped = img_thresh_eroded[top_border:bot_border, left_border:right_border]
+        left, right, top, bot = self.utils_find_topright_borders(img_thresh)
+        if not left and not right and not top and not bot:
+            print "Icon was not found! ?"
+            self.plot_image([img_thresh, img_cropped])
+            return False
+
+        img_cropped = img_thresh[top:bot, left:right]
         height, width = img_cropped.shape[:2]
         
-        # If the image has a blank line in the middle, its because there are
-        # two icons. Split in the middle and recrop!
-        if not img_cropped[:, width/2].any():
-            img_cropped = img_cropped[:, width/2:]
-            left_border, right_border = self.utils_find_borders(img_cropped, leftright=True)
-            img_cropped = img_cropped[:, left_border:right_border]
-            height, width = img_cropped.shape[:2]
-            
-        # Check if a hole of 3x3 is in the middle of the img
-        return not img_cropped[height/2-1:height/2+1, width/2-1:width/2+1].any()
+        # Check if a hole of (n+1)x(n+1) is in the middle of the img
+        # n is appropriate to the whole size of the circle.
+        n = np.floor(height/10.0)
+        return not img_cropped[height/2-n:height/2+1+n, width/2-n:width/2+1+n].any()
         
-        #return self.template_matching(img_thresh, self.template_menu, callee='menu')
-        
-    def utils_find_borders(self, img, leftright=False):
-        """Get the set left, right, top and bottom borders of the images.
-        
-        If left_right is set, just compute left and right border"""
+    def utils_find_topright_borders(self, img):
+        """Get the left, right, top and bottom borders of the rightmost icon in the image."""
         height, width = img.shape[:2]
-        if not leftright:
-            top_border = 0
-            for i in xrange(height):
-                if img[i,:].any():
-                    top_border = i
-                    break
-            bot_border = height
-            for i in xrange(height-1, 0, -1):
-                if img[i,:].any():
-                    bot_border = i
-                    break
-                    
-        left_border = 0
-        for i in xrange(width):
-            if img[:,i].any():
-                left_border = i
-                break
-                
+        # Abort for Recursion
+        if height < 5 or width < 5:
+            return [0,0,0,0]
+            
         right_border = width
         for i in xrange(width-1, 0, -1):
             if img[:,i].any():
-                right_border = i
+                right_border = i+1
+                break   
+        left_border = 0
+        for i in xrange(right_border-1, 0, -1):
+            if not img[:,i].any():
+                left_border = i+1
+                break        
+        top_border = 0
+        for i in xrange(height):
+            if img[i,:].any():
+                top_border = i
+                break   
+        bot_border = height
+        for i in xrange(top_border, height):
+            if not img[i,:].any():
+                bot_border = i
                 break
-                
-        if not leftright:
-            return left_border, right_border, top_border, bot_border
-        return left_border, right_border
+        
+        # if small area is found, noise is present. Try again with reduced image
+        if right_border-left_border < width/10:
+            return self.utils_find_topright_borders(img[:,0:right_border-1])
+        if bot_border-top_border < height/10:
+            return self.utils_find_topright_borders(img[top_border+1:,:])
+        return left_border, right_border, top_border, bot_border
+
 
     def test_scoreboard(self, img):
         """ Tests if the scoreboard is on display
