@@ -4,7 +4,7 @@ import time
 
 from threading import Thread
 
-class OBSRemoteWSHandler():
+class OBSRemoteSwitcher():
     """Handler to talk to OBSRemote by websocket.
     
     Handles authentication, SceneChanges and SceneUpdates
@@ -13,9 +13,22 @@ class OBSRemoteWSHandler():
     def switch_to_scene(self, scene):
         # Set the current scene
         data = {"request-type":'SetCurrentScene', 'scene-name':scene}
-
         self.send(data)
- 
+             
+    def update_scenes(self):
+        data = {"request-type":'GetSceneList'}
+        self.send(data)
+        
+    def send(self, data):
+        if not type(data) == dict or not data:
+            return False
+        data = self.json_encoder.encode(data)
+        self.ws.send(data)
+
+    def authenticate(self):
+        #TODO: Authentication
+        print 'authenticate not yet implemented'
+        
     def on_message(self, ws, message):
         """ Store new information for the overlayswitcher"""
 
@@ -31,40 +44,26 @@ class OBSRemoteWSHandler():
 
         if data.has_key('current-scene'):
             current_scene = data.get('current-scene')
-            self.update_scenes(current_scene)
-            
-    def update_scenes(self, current_scene):
-        self._overlayswitcher.active_scene = current_scene
-        self.updated_scenes = True
-
+            self._overlayswitcher.active_scene = current_scene
+            self.updated_scenes = True        
+        
     def on_error(self, ws, error):
         print "Error in the OBS Remote Handler:", error
 
     def on_open(self, ws):
-        data = {"request-type":'GetSceneList'}
-        self.send(data)
+        self.update_scenes()
         data = {"request-type":'GetAuthRequired'}
         self.send(data)
 
-    def send(self, data):
-        if not type(data) == dict or not data:
-            return False
-        data = self.json_encoder.encode(data)
-        self.ws.send(data)
-
-    def authenticate(self):
-        #TODO: Authentication
-        print 'authenticate not yet implemented'
-
-    def __init__(self, url, auth, overlayswitcher):
+    def __init__(self, settings, overlayswitcher):
         self.json_encoder = json.JSONEncoder()
         self.json_decoder = json.JSONDecoder()
-        self.password = auth
+        self.password = settings.OBS_REMOTE_PASS
         self._overlayswitcher = overlayswitcher
         self.updated_scenes = False #have the scenes been updated yet?
 
         #websocket.enableTrace(True)
-        self.ws = websocket.WebSocketApp("ws://{0}/".format(url),
+        self.ws = websocket.WebSocketApp("ws://{0}/".format(settings.OBS_REMOTE_URL),
                                   on_message=self.on_message,
                                   on_error = self.on_error,
                                   on_open = self.on_open,
@@ -82,9 +81,11 @@ class OBSRemoteWSHandler():
             print 'Websocket created'
 
 if __name__ == '__main__':
-    from settings import OBS_REMOTE_URL, OBS_REMOTE_PASS
+    import settings
     import time
-    
-    handler = OBSRemoteWSHandler(OBS_REMOTE_URL, OBS_REMOTE_PASS, None)
+    class _():  #Dummy Overlayswitcher to avoid exceptions in updates()
+        active_scene=None
+    dummy_ols = _()
+    handler = OBSRemoteSwitcher(settings, dummy_ols)
     print 'OBS Remote works!'
     handler.ws.close()

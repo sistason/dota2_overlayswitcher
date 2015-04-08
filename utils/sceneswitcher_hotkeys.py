@@ -1,16 +1,30 @@
 import time
 import win32api
 
-def press_key(hexKeyCode):
-    win32api.keybd_event(hexKeyCode, 0x0, 0)
+class HotKeySwitcher():
 
-def release_key(hexKeyCode):
-    win32api.keybd_event(hexKeyCode, 0x0, 0x0002)
+    def press_key(self, hexKeyCode):
+        win32api.keybd_event(hexKeyCode, 0x0, 0)
 
-def send_keys(keys):
-    for k in keys:
-        press_key(k)
-        time.sleep(0.05)    #OBS needs this! 0.01 is not enough
+    def release_key(self, hexKeyCode):
+        win32api.keybd_event(hexKeyCode, 0x0, 0x0002)
 
-    for k in keys:
-        release_key(k)
+    def send_keys(self, keys):
+        for k in keys:
+            self.press_key(k)
+            time.sleep(0.05)    #OBS needs this! 0.01 is not enough
+
+        for k in keys:
+            self.release_key(k)
+            
+    def switch_to_scene(self, scene):
+        hotkey_sequence = self.settings.HOTKEYS.get(scene, [])
+        self.send_keys(hotkey_sequence)
+        self._overlayswitcher.active_scene = scene  #Open Loop
+        
+    def update_scenes(self):
+        # Open Loop Control only, no backchannel available
+        return
+        
+    def __init__(self, settings):
+        self.settings = settings

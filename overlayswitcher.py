@@ -8,8 +8,6 @@ import cv2
 import tempfile
 import os
 
-import utils.sceneswitcher_obsremote, utils.sceneswitcher_hotkeys
-
 from utils.ols_tests import TestGameEnv, DotaLogWatcher
 from utils import settings
 
@@ -24,38 +22,38 @@ class OverlaySwitcher(TestGameEnv):
     Dota 2 must be in Borderless Window Mode :(
     """
 
-    THRESH_DRAFT = 50 
-    THRESH_INGAME = 65
-    THRESH_LOADINGMAP = 10
-    COLOR_BGR_SCORE = (26, 23, 22)
-    COLOR_HSV_MENU = ((15,10,10),(41,255,255))
-    COLOR_BGR_LOADINGPLAYERS_RED = ((0,0,100),(50,50,255))
-    COLOR_RGB_LOADINGPLAYERS_RED = ((100,0,0),(255,50,50))
-    COLOR_RGB_LOADINGPLAYERS_GREEN = ((0,100,0),(50,255,50))
+    COLOR_HSV_MENU = ((15,10,10),(41,255,255))    
+#    THRESH_DRAFT = 50 
+#    THRESH_INGAME = 65
+#    THRESH_LOADINGMAP = 10
+#    COLOR_BGR_SCORE = (26, 23, 22)
+
+#    COLOR_BGR_LOADINGPLAYERS_RED = ((0,0,100),(50,50,255))
+#    COLOR_RGB_LOADINGPLAYERS_RED = ((100,0,0),(255,50,50))
+#    COLOR_RGB_LOADINGPLAYERS_GREEN = ((0,100,0),(50,255,50))
 
 
     def __init__(self, bare=False, path=''):
         self.base_state = ''    #State of the log-file
-        self.dota_hwnd = 0
-        self._work_lock = False
-
-        self.active_scene = ''
+        self.dota_hwnd = 0      #Dota 2 window-id
+        self._work_lock = False #Lock, as logfile and timer work in parallel
+        self.active_scene = ''  #Active OBS scene
+        
         self.OVERLAYS = settings.OVERLAYS
         self.LOCKED_SCENES = settings.LOCKED_SCENES
         self.WHITELIST_SCENES = settings.WHITELIST_SCENES
 
         if settings._USE_HOTKEYS:
-            self.switch_to_scene = utils.sceneswitcher_hotkeys.switch_to_scene
+            import utils.sceneswitcher_hotkeys
+            self.sceneswitcher = utils.sceneswitcher_hotkeys.HotKeySwitcher(settings)
         else:
-            _h = utils.sceneswitcher_obsremote.OBSRemoteWSHandler
-            self.obsremotehandler = _h(settings.OBS_REMOTE_URL, settings.OBS_REMOTE_PASS, self)
-            if not self.obsremotehandler.updated_scenes:
+            import utils.sceneswitcher_obsremote
+            self.sceneswitcher = utils.sceneswitcher_obsremote.OBSRemoteSwitcher(settings, self)
+            if not self.sceneswitcher.updated_scenes:
                 print 'OverlaySwitcher not created, error with the OBS Remote'
                 del self
                 return
-            self.switch_to_scene = self.obsremotehandler.switch_to_scene
-            
-
+           
         if not self.init_dota_log(path):
             print 'OverlaySwitcher not created, error with the Dota 2 logfile'
             del self
@@ -88,16 +86,17 @@ class OverlaySwitcher(TestGameEnv):
         if self.active_scene in self.LOCKED_SCENES and self.LOCKED_SCENES or\
            self.active_scene not in self.WHITELIST_SCENES and self.WHITELIST_SCENES:
            return
-        self.active_scene = new_obs_scene
         
-        self.switch_to_scene(new_obs_scene)
-        print "Dota state is now {0}, OBS scene changed to {1}".format(game_state, new_obs_scene)
+        self.sceneswitcher.switch_to_scene(new_obs_scene)
+        print "Dota state is now {0}, OBS scene changed to {1}".format(dota_game_state, new_obs_scene)
         
     def work(self):
         """Main-loop: take screenshot, determine the game state and switch.
 
         Since it is called when the scene changes via the log-watcher, it
         needs to be locked..."""
+        self.sceneswitcher.update_scenes()
+        
         while self._work_lock:
             time.sleep(0.016)
         self._work_lock = True
