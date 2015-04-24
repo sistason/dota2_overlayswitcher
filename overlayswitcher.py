@@ -38,6 +38,7 @@ class OverlaySwitcher(TestGameEnv):
         self.base_state = ''    #State of the log-file
         self.dota_hwnd = 0
         self._work_lock = False
+        self._terminate = False
 
         self.active_scene = ''
         self.OVERLAYS = settings.OVERLAYS
@@ -120,7 +121,7 @@ class OverlaySwitcher(TestGameEnv):
         """
         interval = 0.5
         try:
-            while True:
+            while not self._terminate:
                 next_ = time.time()+interval
 
                 self.work()
@@ -133,6 +134,10 @@ class OverlaySwitcher(TestGameEnv):
             time.sleep(10)  # To read the Exception ;)
 
         self.dota_log_watcher.stop()
+        self._terminate = False
+
+    def stop(self):
+        self._terminate = True
         
     def get_dota_hwnd(self):
         """Get the current Dota 2 Windows window number."""
