@@ -70,8 +70,9 @@ class TestGameEnv():
         # draft, scoreboard, loadingplayers > ingame (minimize-icon)
 
         #Simple, distinct icon-searches
-        if self.base_state == 'MENU' or self.test_menu(img):
+        if self.base_state == 'MENU' or self.test_menu(img):# or self.test_loadingscreen(img):
             return 'MENU'
+        #self.plot_image(img)
         return self.base_state
         
         # ---------- Functions to determine complete state from screenshot ----
@@ -110,6 +111,15 @@ class TestGameEnv():
                 return True
         return False
 
+    def test_loadingscreen(self, img):
+        """Tests if Dota is in the loading screen
+        
+        Checks if the "Loading..." is there. Black-background around that
+        """
+        height, width = img.shape[:2]
+        i_ = img[-width/100.0+width/20:-width/100.0, -height/100.0+height/20:-height/100.0]
+        #self.plot_image(i_)
+        
     def test_menu(self, img):
         """ Tests if Dota is in the menu
 
@@ -132,7 +142,7 @@ class TestGameEnv():
         left, right, top, bot = self.utils_find_topright_borders(img_thresh)
         if not left and not right and not top and not bot:
             print "Icon was not found! ?"
-            self.plot_image([img_thresh, img_cropped])
+            self.plot_image(img_thresh)
             return False
 
         img_cropped = img_thresh[top:bot, left:right]
@@ -266,8 +276,8 @@ class TestGameEnv():
         img = img[-100:, -150:]
         img_gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
         _, img_thresh = cv2.threshold(img_gray, self.THRESH_LOADINGMAP, 255, cv2.THRESH_BINARY)
-        return self.template_matching(img_thresh, self.template_loadingmap, callee='loadingmap')        
-
+        return self.template_matching(img_thresh, self.template_loadingmap, callee='loadingmap')
+        
     def test_draft(self, img):
         """Tests if the dota client is in draft.
         
@@ -325,6 +335,7 @@ class TestGameEnv():
         pl.figure()
         
         if type(imgs) not in [list, set]:
+            imgs = cv2.cvtColor(imgs, cv2.COLOR_BGR2RGB)
             pl.imshow(imgs, interpolation='nearest')
         else:
             for j, i in enumerate(imgs):
