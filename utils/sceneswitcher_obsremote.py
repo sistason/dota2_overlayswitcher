@@ -18,6 +18,9 @@ class OBSRemoteSwitcher():
     def update_scenes(self):
         data = {"request-type":'GetSceneList'}
         self.send(data)
+
+    def is_obs_streaming(self):
+        return self.obs_streaming
         
     def send(self, data):
         if not type(data) == dict or not data:
@@ -37,6 +40,8 @@ class OBSRemoteSwitcher():
             self.authenticate()
         if data.get('update-type','') == 'StreamStatus':
             pass
+        if data.has_key('streaming'):
+            self.obs_streaming = bool(data.get('streaming'))
         if type(data.get('scenes',None)) == list:
             pass
 #            print data.get('current-scene','')
@@ -71,10 +76,12 @@ class OBSRemoteSwitcher():
         self.thread = Thread(target=self.ws.run_forever, args=())
         self.thread.start()
         timeout = 0
-        while not self.updated_scenes and timeout < 10:
+        while not self.updated_scenes and timeout < 10 and self.thread.is_alive():
             time.sleep(0.5)
             timeout += 1
-        if timeout >= 10:
+        if not self.thread.is_alive():
+            print 'Could not establish a connection to OBSRemote! Aborting'
+        elif timeout >= 10:
             print 'No Data received by OBSRemote for 5 seconds! Connection Problems!'
             self.ws.close()
         else:

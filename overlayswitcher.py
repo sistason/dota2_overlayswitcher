@@ -1,12 +1,14 @@
 ﻿#!/usr/bin/env python
 
-import win32gui, win32con, win32ui
+import os
+if os.name == 'nt':
+    import win32gui, win32con, win32ui
+
 import time
 
 import cv2
 
 import tempfile
-import os
 
 from utils.ols_tests import TestGameEnv, DotaLogWatcher
 from utils import settings
@@ -58,7 +60,6 @@ class OverlaySwitcher(TestGameEnv):
            
         if not self.init_dota_log(path):
             print 'OverlaySwitcher not created, error with the Dota 2 logfile'
-            del self
             return
         print 'OverlaySwitcher sucessfully created'
         
