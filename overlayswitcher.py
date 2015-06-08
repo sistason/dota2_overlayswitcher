@@ -136,7 +136,7 @@ class OverlaySwitcher(TestGameEnv):
         if self.dota_log_watcher is not None:
             self.dota_log_watcher.stop()
         if self.sceneswitcher is not None:
-        self.sceneswitcher.stop()
+            self.sceneswitcher.stop()
 
     def stop(self):
         self._terminate = True
