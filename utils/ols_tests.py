@@ -17,7 +17,7 @@ class DotaLogWatcher():
         self.path = path
         self._overlayswitcher = overlayswitcher
         self._dota_log = open(self.path, 'r+')
-        self._thread = Thread(target=self._spin)
+        self._thread = Thread(target=self._spin, name='thread-overlayswitcher.dotalogwatcher._spin')
         self._thread.start()
         
     def stop(self):

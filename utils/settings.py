@@ -25,7 +25,7 @@ WHITELIST_SCENES = ['Dota noOverlay', 'Dota Overlay CM-Draft', 'Dota Overlay Ing
 _USE_HOTKEYS = False
 # ------------------ OBS Remote ------------------ #
 # Use the OBSRemote Plugin to switch scenes via a websocket
-OBS_REMOTE_URL = '127.0.0.1:4444'
+OBS_REMOTE_URL = '192.168.1.5:4444'
 OBS_REMOTE_PASS = ''    #Optional, if selected in OBSRemote
 
 # ------------------ Hotkeys ------------------ #

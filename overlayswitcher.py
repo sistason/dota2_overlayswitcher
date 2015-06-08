@@ -42,7 +42,7 @@ class OverlaySwitcher(TestGameEnv):
         self.dota_hwnd = 0      #Dota 2 window-id
         self._work_lock = False #Lock, as logfile and timer work in parallel
         self.active_scene = ''  #Active OBS scene
-        
+
         self.OVERLAYS = settings.OVERLAYS
         self.LOCKED_SCENES = settings.LOCKED_SCENES
         self.WHITELIST_SCENES = settings.WHITELIST_SCENES
@@ -53,11 +53,7 @@ class OverlaySwitcher(TestGameEnv):
         else:
             import utils.sceneswitcher_obsremote
             self.sceneswitcher = utils.sceneswitcher_obsremote.OBSRemoteSwitcher(settings, self)
-            if not self.sceneswitcher.updated_scenes:
-                print 'OverlaySwitcher not created, error with the OBS Remote'
-                del self
-                return
-           
+        self.dota_log_watcher = None
         if not self.init_dota_log(path):
             print 'OverlaySwitcher not created, error with the Dota 2 logfile'
             return
@@ -121,6 +117,9 @@ class OverlaySwitcher(TestGameEnv):
         (screenshots + analysis)
         """
         interval = 0.5
+        if self._terminate:
+            self._terminate = False
+            self.sceneswitcher.start()
         try:
             while not self._terminate:
                 next_ = time.time()+interval
@@ -134,8 +133,10 @@ class OverlaySwitcher(TestGameEnv):
             print e
             time.sleep(10)  # To read the Exception ;)
 
-        self.dota_log_watcher.stop()
-        self._terminate = False
+        if self.dota_log_watcher is not None:
+            self.dota_log_watcher.stop()
+        if self.sceneswitcher is not None:
+        self.sceneswitcher.stop()
 
     def stop(self):
         self._terminate = True

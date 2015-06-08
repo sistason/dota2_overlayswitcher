@@ -26,9 +26,11 @@ class HotKeySwitcher():
         # Open Loop Control only, no backchannel available
         return
 
-    def is_obs_streaming(self):
-        # No backchannel, no method available
-        return False
+    def start(self):
+        return
+
+    def stop(self):
+        return
         
     def __init__(self, settings):
         self.settings = settings
